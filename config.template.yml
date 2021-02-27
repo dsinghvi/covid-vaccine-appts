@@ -1,0 +1,6 @@
+sender:
+  email: bla@gmail.com
+  password: password
+recipients:
+  - blabla@gmail.com
+  - blublu@gmail.com

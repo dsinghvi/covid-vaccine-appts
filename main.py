@@ -1,6 +1,10 @@
-import requests
 import json
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import yaml
 import pandas as pd
+import requests
 from tabulate import tabulate
 
 vendor_col_name = "vendor"
@@ -54,6 +58,44 @@ def fetch_cvs_vaccine_data(state, results_df):
     return results_df
 
 
+def send_email(appointments_df, results_df):
+    email_config = get_email_config()
+    msg = MIMEMultipart()
+    msg['Subject'] = "Covid Vaccine Notifications!"
+    msg['From'] = email_config["sender"]["email"]
+    html_attmt = """\
+    <html>
+      <head></head>
+      <body>
+        <h1>The first table shows places where appointments are available</h1>
+        <div>
+            {0}
+        </div>
+        
+        <h1>The second table shows organizations that we searched</h1>
+        <div>
+            {1}
+        </div>
+      </body>
+    </html>
+    """.format(appointments_df.to_html(), results_df.to_html())
+    mime_text = MIMEText(html_attmt, 'html')
+    msg.attach(mime_text)
+
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login(email_config["sender"]["email"], email_config["sender"]["password"])
+    server.sendmail(msg['From'], email_config["recipients"], msg.as_string())
+    server.quit()
+
+
+def get_email_config():
+    with open(r'config.yml') as file:
+        email_config = yaml.load(file, Loader=yaml.FullLoader)
+        print(email_config)
+        return email_config
+
+
 if __name__ == '__main__':
     print("Starting program...")
     results_df = pd.DataFrame({
@@ -74,3 +116,8 @@ if __name__ == '__main__':
     print("Printing open appointments dataset...")
     open_appointments_df = results_df[(results_df[appts_available_col_name]==True)]
     print(tabulate(open_appointments_df, headers='keys', tablefmt='psql'))
+    # send email if there are open appointments
+    # make sure that you have a file called config.yml that has actual senders and recipients configured!
+    if not open_appointments_df.empty:
+        send_email(open_appointments_df, results_df)
+
