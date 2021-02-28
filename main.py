@@ -6,6 +6,8 @@ import yaml
 import pandas as pd
 import requests
 from tabulate import tabulate
+import os.path
+from os import path
 
 vendor_col_name = "vendor"
 state_col_name = "state"
@@ -113,6 +115,20 @@ def get_config():
         return config
 
 
+def get_prev_appointments_df():
+    if not path.exists('apointments_df.csv'):
+        return pd.DataFrame({
+            vendor_col_name: pd.Series([], dtype='str'),
+            state_col_name: pd.Series([], dtype='str'),
+            appts_available_col_name: pd.Series([], dtype='bool'),
+            city_col_name: pd.Series([], dtype='str'),
+            address_col_name: pd.Series([], dtype='str'),
+            phone_col_name: pd.Series([], dtype='str'),
+            notes_col_name: pd.Series([], dtype='str'),
+            link_col_name: pd.Series([], dtype='str')})
+    return pd.read_csv('apointments_df.csv', index_col=0)
+
+
 if __name__ == '__main__':
     print("Starting program...")
     results_df = pd.DataFrame({
@@ -133,11 +149,15 @@ if __name__ == '__main__':
     results_df = fetch_riteaid_vaccine_data(datasources_config["riteaid"], results_df)
     print("Printing full dataset...")
     print(tabulate(results_df, headers='keys', tablefmt='psql'))
+    print("Printing previous open appointments dataset...")
+    prev_appointments_df = get_prev_appointments_df()
+    print(tabulate(prev_appointments_df, headers='keys', tablefmt='psql'))
     print("Printing open appointments dataset...")
     open_appointments_df = results_df[(results_df[appts_available_col_name] == True)]
     print(tabulate(open_appointments_df, headers='keys', tablefmt='psql'))
     # send email if there are open appointments
     # make sure that you have a file called config.yml that has actual senders and recipients configured!
     email_config = config["email"]
-    if not open_appointments_df.empty:
+    if not open_appointments_df.empty and not open_appointments_df.equals(prev_appointments_df):
+        open_appointments_df.to_csv('apointments_df.csv')
         send_email(email_config, open_appointments_df, results_df)
