@@ -1,6 +1,19 @@
-sender:
-  email: bla@gmail.com
-  password: password
-recipients:
-  - blabla@gmail.com
-  - blublu@gmail.com
+email:
+  sender:
+    email: bla@gmail.com
+    password: password
+  recipients:
+    - blabla@gmail.com
+    - blublu@gmail.com
+datasources:
+  cvs:
+    states:
+      - NJ
+      - NY
+      - MD
+      - VA
+  riteaid:
+    - zip: 07920
+      radius: 50
+    - zip: 22044
+      radius: 50
