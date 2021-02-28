@@ -13,6 +13,7 @@ appts_available_col_name = "appointment_available"
 city_col_name = "city"
 address_col_name = "address"
 phone_col_name = "phone"
+notes_col_name = "notes"
 link_col_name = "link"
 
 
@@ -36,15 +37,17 @@ def fetch_riteaid_vaccine_data_by_zip(zip, radius, results_df):
         store_vaccine_url = "https://www.riteaid.com/services/ext/v2/vaccine/checkSlots?storeNumber=" + str(store_num)
         store_vaccine_response = requests.get(store_vaccine_url)
         parsed_store_vacciene_response = json.loads(store_vaccine_response.text)
-        slots_available = parsed_store_vacciene_response["Data"]["slots"]["1"] \
-                          or parsed_store_vacciene_response["Data"]["slots"]["2"]
+        slot_one_available = parsed_store_vacciene_response["Data"]["slots"]["1"]
+        slot_two_available = parsed_store_vacciene_response["Data"]["slots"]["2"]
         results_df = results_df.append({
             vendor_col_name: "RiteAid",
             state_col_name: store_info["state"],
             city_col_name: store_info["city"],
             address_col_name: store_info["address"],
             phone_col_name: store_info["fullPhone"],
-            appts_available_col_name: slots_available,
+            link_col_name: "https://www.riteaid.com/pharmacy/covid-qualifier",
+            appts_available_col_name: slot_one_available or slot_two_available,
+            notes_col_name: "slot one is " + str(slot_one_available) + " and slot two is " + str(slot_two_available)
         }, ignore_index=True)
     return results_df
 
@@ -119,6 +122,7 @@ if __name__ == '__main__':
         city_col_name: pd.Series([], dtype='str'),
         address_col_name: pd.Series([], dtype='str'),
         phone_col_name: pd.Series([], dtype='str'),
+        notes_col_name: pd.Series([], dtype='str'),
         link_col_name: pd.Series([], dtype='str')})
     print("Reading config...")
     config = get_config()
@@ -130,11 +134,10 @@ if __name__ == '__main__':
     print("Printing full dataset...")
     print(tabulate(results_df, headers='keys', tablefmt='psql'))
     print("Printing open appointments dataset...")
-    open_appointments_df = results_df[(results_df[appts_available_col_name]==True)]
+    open_appointments_df = results_df[(results_df[appts_available_col_name] == True)]
     print(tabulate(open_appointments_df, headers='keys', tablefmt='psql'))
     # send email if there are open appointments
     # make sure that you have a file called config.yml that has actual senders and recipients configured!
     email_config = config["email"]
     if not open_appointments_df.empty:
         send_email(email_config, open_appointments_df, results_df)
-
