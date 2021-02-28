@@ -16,7 +16,16 @@ phone_col_name = "phone"
 link_col_name = "link"
 
 
-def fetch_riteaid_vaccine_data(zip, radius, results_df):
+def fetch_riteaid_vaccine_data(riteaid_config, results_df):
+    for zip_config in riteaid_config:
+        results_df = fetch_riteaid_vaccine_data_by_zip(
+            str(zip_config["zip"]),
+            str(zip_config["radius"]),
+            results_df)
+    return results_df
+
+
+def fetch_riteaid_vaccine_data_by_zip(zip, radius, results_df):
     print("Fetching RiteAid vaccine info for the closest 10 stores within a " + radius + " mile radius of " + zip)
     url = "https://www.riteaid.com/services/ext/v2/stores/getStores?" \
           "address=" + zip + "&attrFilter=PREF-112&radius=" + radius
@@ -40,7 +49,14 @@ def fetch_riteaid_vaccine_data(zip, radius, results_df):
     return results_df
 
 
-def fetch_cvs_vaccine_data(state, results_df):
+def fetch_cvs_vaccine_data(cvs_config, results_df):
+    cvs_states = cvs_config["states"]
+    for state in cvs_states:
+        results_df = fetch_cvs_vaccine_data_by_state(state, results_df)
+    return results_df
+
+
+def fetch_cvs_vaccine_data_by_state(state, results_df):
     print("Fetching CVS vaccine info for " + state)
     url = "https://www.cvs.com/immunizations/covid-19-vaccine.vaccine-status." + state + ".json?vaccineinfo"
     headers = {"referer": "https://www.cvs.com/immunizations/covid-19-vaccine"}
@@ -58,8 +74,7 @@ def fetch_cvs_vaccine_data(state, results_df):
     return results_df
 
 
-def send_email(appointments_df, results_df):
-    email_config = get_email_config()
+def send_email(email_config, appointments_df, results_df):
     msg = MIMEMultipart()
     msg['Subject'] = "Covid Vaccine Notifications!"
     msg['From'] = email_config["sender"]["email"]
@@ -89,11 +104,10 @@ def send_email(appointments_df, results_df):
     server.quit()
 
 
-def get_email_config():
+def get_config():
     with open(r'config.yml') as file:
-        email_config = yaml.load(file, Loader=yaml.FullLoader)
-        print(email_config)
-        return email_config
+        config = yaml.load(file, Loader=yaml.FullLoader)
+        return config
 
 
 if __name__ == '__main__':
@@ -106,11 +120,13 @@ if __name__ == '__main__':
         address_col_name: pd.Series([], dtype='str'),
         phone_col_name: pd.Series([], dtype='str'),
         link_col_name: pd.Series([], dtype='str')})
+    print("Reading config...")
+    config = get_config()
+    datasources_config = config["datasources"]
     print("Fetching data for CVS...")
-    results_df = fetch_cvs_vaccine_data("NY", results_df)
-    results_df = fetch_cvs_vaccine_data("NJ", results_df)
+    results_df = fetch_cvs_vaccine_data(datasources_config["cvs"], results_df)
     print("Fetching data for Rite Aid... ")
-    results_df = fetch_riteaid_vaccine_data("07920", "50", results_df)
+    results_df = fetch_riteaid_vaccine_data(datasources_config["riteaid"], results_df)
     print("Printing full dataset...")
     print(tabulate(results_df, headers='keys', tablefmt='psql'))
     print("Printing open appointments dataset...")
@@ -118,6 +134,7 @@ if __name__ == '__main__':
     print(tabulate(open_appointments_df, headers='keys', tablefmt='psql'))
     # send email if there are open appointments
     # make sure that you have a file called config.yml that has actual senders and recipients configured!
+    email_config = config["email"]
     if not open_appointments_df.empty:
-        send_email(open_appointments_df, results_df)
+        send_email(email_config, open_appointments_df, results_df)
 
